@@ -25,15 +25,13 @@ c = 2       # cost
 b = 3       # benefit
 d = 0.01    # selection intensity, assumed to be small (d≪1)
 
-max_weight = 5  # Set at 1 if uniform weights are needed
-
 G = nx.complete_graph(n)            # ...Try also with connected and bipartite graphs
-nx.set_edge_attributes(G, 1, 'w')   # unclear... What does weight signify?
+nx.set_edge_attributes(G, 0, 'w')   # unclear... What does weight signify?
 
 rng = np.random.default_rng(seed=42)
 
 for i,j in G.edges():     # Assign a random weight between 1 and max_weight to all edges of the graph
-    G.edges[i, j]['w'] = int(rng.integers(low=1, high=max_weight+1))
+    G.edges[i, j]['w'] = int(rng.uniform(low=0.0, high=1.0))
 
 for i in G:      # Assign a strategy to each node (Defector or Cooperator -> 0 or 1)
     G.nodes[i]['x'] = define_random_strategy(rng.random())
@@ -45,8 +43,9 @@ for i in G:
     xi = G.nodes[i]['x']        # 0 or 1 — is i a cooperator?
     u = 0
     for j in G.neighbors(i):
-        xj = G.nodes[j]['x']    # 0 or 1 — is i's neighbor j a cooperator? 
-        u += G.edges[i,j]['w'] * ((b * xj) - (c * xi))      # accumulated payoff of i
+        xj = G.nodes[j]['x']    # 0 or 1 — is i's neighbor j a cooperator?
+        wij = G.edges[i,j]['w']
+        u += wij * ((b * xj) - (c * xi))      # accumulated payoff of i
 
     # Transform accumulated payoff of i into its fecundity
     G.nodes[i]['F'] = 1 + d * u         # where d is the selection intensity
@@ -66,3 +65,7 @@ j = rng.choice(list(G.neighbors(i)), p=e)
 G.nodes[i]['x'] = G.nodes[j]['x']
 
 # Population transition step (exogenous transformation)
+
+
+
+
