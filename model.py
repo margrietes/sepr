@@ -30,8 +30,8 @@ nx.set_edge_attributes(G, 0, 'w')   # unclear... What does weight signify?
 
 rng = np.random.default_rng(seed=42)
 
-for i,j in G.edges():     # Assign a random weight between 1 and max_weight to all edges of the graph
-    G.edges[i, j]['w'] = int(rng.uniform(low=0.0, high=1.0))
+for i,j in G.edges():     # Assign a random weight between 0 and 1 to all edges of the graph
+    G.edges[i, j]['w'] = rng.uniform(low=0.0, high=1.0)
 
 for i in G:      # Assign a strategy to each node (Defector or Cooperator -> 0 or 1)
     G.nodes[i]['x'] = define_random_strategy(rng.random())
