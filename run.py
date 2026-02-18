@@ -1,1 +1,31 @@
-# Run the model
+"""
+This Python script runs the dynamic network model that will be used to experiment
+with the strategic evolution of cooperation.
+
+"""
+
+# Import libraries.
+
+import model as ce
+import graph_generation as gg
+
+# Assign model values.
+
+n = 10    # Number of nodes in the graph
+c = 2     # Cost coefficient
+b = 3     # Benefit coefficient
+T = 10   # Number of time steps to run the model for
+
+# Generate a list of network structures.
+
+Graphs = [
+    gg.star_complete_barbell_graph(size=n, first='star'),
+    gg.star_complete_barbell_graph(size=n, first='complete')
+]
+
+# Run the model.
+
+for t in range(T):
+    model = ce.CooperationEvolution(Graphs=Graphs, c=c, b=b)
+    model.run(T=1, p=1/len(Graphs))
+
