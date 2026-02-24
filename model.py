@@ -159,7 +159,7 @@ class CooperationEvolution:
         Evaluates the condition for selection to favor cooperation over defection in the limit of weak selection (d→0).
 
         Returns:
-            A string indicating whether selection favors cooperation, defection, or is neutral.
+            A string indicating whether selection favors cooperation or defection.
 
         """
 
@@ -170,14 +170,27 @@ class CooperationEvolution:
         S, U = np.linalg.eig(self.Q.T)
         u = list((U[:,np.isclose(S, 1)][:,0] / U[:,np.isclose(S, 1)][:,0].sum()).real)
 
-        condition = True   # pC > pD 
+        # Compute the reproductive value pi of a node i.
+        # In this experiment, the reproductive value applied is a generalization of Fisher's
+        # classical notion that accounts for environmental changes.
+        # Source: ?
+        # pi = ...
 
-        # pC is the probability that a single cooperator mutant takes over a resident 
-        # population of defectors;
-        # pD is the probability that a single defector mutant takes over a resident 
+        # Compute expected number of steps to the most recent common ancestor of the population.
+        # T = ...
+
+        # Compute expected time to the most recent common ancestor of i and j.
+
+        # Compute pC, the probability that a single cooperator mutant takes over a resident 
+        # population of defectors
+        pC = 0
+
+
+        # Compute pD, the probability that a single defector mutant takes over a resident 
         # population of cooperators.
+        pD = 0
 
-        return "Selection favors cooperation." if condition else "Selection favors defection."
+        return "Selection favors cooperation." if pC > pD else "Selection favors defection."
 
 
         

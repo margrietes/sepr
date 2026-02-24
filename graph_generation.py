@@ -36,3 +36,11 @@ def star_complete_barbell_graph(size: int, first: str) -> nx.Graph:
         raise ValueError("Argument 'first' must have value 'star' or 'complete'.")
 
     return G
+
+# Implement graph with three components: two stars and a complete graph.
+
+# Implement...
+
+# ...
+
+# ...
