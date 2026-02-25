@@ -7,7 +7,7 @@ with the strategic evolution of cooperation.
 # Import libraries.
 
 import model as ce
-import graph_generation as gg
+import graphs as g
 
 # Assign model values.
 
@@ -19,13 +19,14 @@ T = 10   # Number of time steps to run the model for
 # Generate a list of network structures.
 
 Graphs = [
-    gg.star_complete_barbell_graph(size=n, first='star'),
-    gg.star_complete_barbell_graph(size=n, first='complete')
+    g.star_complete_barbell_graph(size=n, first='star'),
+    g.star_complete_barbell_graph(size=n, first='complete')
 ]
 
 # Run the model.
 
 for t in range(T):
-    model = ce.CooperationEvolution(Graphs=Graphs, c=c, b=b)
-    model.run(T=1, p=1/len(Graphs))
+    model = ce.CooperationEvolution(L=Graphs, c=c, b=b, p=1/len(Graphs))
+    model.run(T=1)
+    
 

@@ -15,28 +15,29 @@ class CooperationEvolution:
 
     """
     
-    def __init__(self, Graphs, c: float, b: float, d: float =0.01, seed: int =42):
+    def __init__(self, L, c: float, b: float, p: float, d: float =0.01, seed: int =42):
 
         """
         Args:  
-            Graphs: A list of graphs, assumed to be connected graphs generated with NetworkX.
+            L: A list of NetworkX graphs, assumed to be connected graphs.
             c: Cost coefficient for any Cooperator node.
             b: Benefit coefficient for any node with a Cooperator neighbor.
+            p: Probability of remaining in the same network state.
             d: Selection intensity, assumed to be small or weak (d≪1).
             seed: Seed for a random number generator.
 
         """
         
-        if not isinstance(Graphs, list) or not all(isinstance(g, nx.Graph) for g in Graphs):
-            raise TypeError("G must be a list of NetworkX Graph objects.")
+        if not isinstance(L, list) or not all(isinstance(g, nx.Graph) for g in L):
+            raise TypeError("L must be a list of NetworkX Graph objects.")
 
-        if not all(nx.is_connected(g) for g in Graphs):
-            raise ValueError("All graphs in G must be connected.")
+        if not all(nx.is_connected(G) for G in L):
+            raise ValueError("All graphs in L must be connected.")
         
         if (c < 0) or (b < 0):
             raise ValueError("Cost and benefit must be non-negative.")
 
-        self.Graphs = Graphs
+        self.L = L
         self.c = c
         self.b = b
         self.d = d
@@ -45,9 +46,21 @@ class CooperationEvolution:
         self.rng = np.random.default_rng(seed=seed)
 
         # Define the initial network state.
-        self.L = len(Graphs)
-        self.state = self.rng.integers(low=0, high=self.L)
-        self.G = Graphs[self.state]
+        state = self.rng.integers(low=0, high=len(self.L))
+        self.G = self.L[state]
+        self.n = self.G.number_of_nodes()
+
+        # Generate a LxL transition matrix Q (a sticky symmetric matrix).
+        L = len(self.L)
+        Q = np.full((L, L), (1 - p) / (L - 1))
+        np.fill_diagonal(Q, p)
+        self.Q = Q
+
+        # Compute the stationary distribution u of the transition matrix Q.
+        # Source: 
+        # https://datascience.oneoffcoder.com/markov-chain-stationary-distribution.html (Section 11.3. "Numpy, eig")
+        S, U = np.linalg.eig(self.Q.T)
+        self.u = list((U[:,np.isclose(S, 1)][:,0] / U[:,np.isclose(S, 1)][:,0].sum()).real)
 
         # Assign a random weight between 0 and 1 to all edges of the graph.
         nx.set_edge_attributes(self.G, 0, 'w')   # Weight indicates the influence between i and j
@@ -112,38 +125,27 @@ class CooperationEvolution:
             # Update strategy.
             self.G.nodes[i]['x'] = self.G.nodes[j]['x']
 
-    def population_transition(self, p: float) -> None:
+    def population_transition(self) -> None:
 
         """
         Executes an exogenous transformation of the population.
 
         Args:
-            L: Number of network states.
-            p: Probability otf remaining in the same network state.
+            L: Network states.
 
         """
 
-        # Generate a LxL transition matrix Q.
-        # Sticky symmetric matrix
-        # Or should i use a pure markov chain?
-        L = self.L
-        Q = np.full((L, L), (1 - p) / (L - 1))
-        np.fill_diagonal(Q, p)
-        self.Q = Q
-
         # Pick a new network state according to the transition probabilities in Q.
-        new_state = self.rng.choice(L, p=Q[self.state])
-        self.G = self.Graphs[new_state] 
-        self.state = new_state
+        new_state = self.rng.choice(len(self.L), p=self.Q[self.L.index(self.G)])
+        self.G = self.L[new_state] 
 
-    def run(self, T: int, p: float, strategy_updates: int = 1) -> None:
+    def run(self, T: int, strategy_updates: int = 1) -> None:
 
         """
         Simulates the evolution of cooperation in a dynamic network.
 
         Args:
             T: Number of time steps to run the model for.
-            p: Probability of remaining in the same network state.
             strategy_updates: The number of times that a random strategy update occurs in one single time step.
 
         """
@@ -151,44 +153,76 @@ class CooperationEvolution:
         for t in range(T):
             self.play()
             self.update_strategy(iterations=strategy_updates)
-            self.population_transition(p=p)
+            self.population_transition()
 
     def selection(self) -> str:
-
         """
         Evaluates the condition for selection to favor cooperation over defection in the limit of weak selection (d→0).
 
         Returns:
             A string indicating whether selection favors cooperation or defection.
-
         """
 
-        # Compute the stationary distribution u of the transition matrix Q.
-        # Source: 
-        # https://datascience.oneoffcoder.com/markov-chain-stationary-distribution.html
-        # 11.3. "Numpy, eig"
-        S, U = np.linalg.eig(self.Q.T)
-        u = list((U[:,np.isclose(S, 1)][:,0] / U[:,np.isclose(S, 1)][:,0].sum()).real)
+        def random_walk_probability(b, i, j):  
+            """Args: b: A network state (graph) in L; i: A node in b; j: A neighbor of i in b. Returns the probability that a random walk from i to j is taken, proportional to edge weight of i and j."""
+            p_ij = b.edges[i,j]['w'] / sum(b.edges[i,k]['w'] for k in b.neighbors(i))
+            return p_ij
+        
+        def pi():
+            """Args: ..."""
+            
+            # The calculation applied is a generalization of Fisher's classical notion that 
+            # accounts for environmental changes (see Equation 7 in Methods).
 
-        # Compute the reproductive value pi of a node i.
-        # In this experiment, the reproductive value applied is a generalization of Fisher's
-        # classical notion that accounts for environmental changes.
-        # Source: ?
-        # pi = ...
+            ### APPLY LINEAR SYSTEM HERE ###
+            ### CHECK THAT SUM OF PI OVER ALL NODES IN A NETWORK IS 1 ###
 
-        # Compute expected number of steps to the most recent common ancestor of the population.
-        # T = ...
+            return 0
+        
+        def coalescence_times(b_idx, i, j):
+            """Args: ..."""
 
-        # Compute expected time to the most recent common ancestor of i and j.
+            if i == j:
+                t = 0
+            else:
 
-        # Compute pC, the probability that a single cooperator mutant takes over a resident 
-        # population of defectors
+                def q_tilde(b_idx, g_idx):
+                    return (self.u[g_idx] / self.u[b_idx]) * self.Q[g_idx, b_idx]
+            
+                t = 0 ### IMPLEMENT LINEAR SYSTEM HERE TO SOLVE FOR t ###
+
+            T = self.n * t
+            return T, t
+        
+        def payoff(b, i):
+            "Args: ..."
+            T, t1 = 0, 0 # coalescence_times(ARGS)
+            T, t2 = 0, 0 # coalescence_times(ARGS)
+            payoff = sum((  - (T - t1) * b.edges[i,l]['w'] * self.c
+                            + (T - t2) * b.edges[l,i]['w'] * self.b) for l in b.nodes())
+            return payoff
+
         pC = 0
-
-
-        # Compute pD, the probability that a single defector mutant takes over a resident 
-        # population of cooperators.
         pD = 0
+            
+        # Iterate through all network states b in L.
+        for b_idx, b in enumerate(self.L):
+
+            # Iterate through all nodes i in network state b.
+            for i in b.nodes():
+
+                # Iterate through all neighbors j of node i in network state b.
+                for j in b.neighbors(i):
+
+                    # Compute pC, the probability that a single cooperator mutant takes over a resident 
+                    # population of defectors
+                    pC += self.u[b_idx] * 1 ### FILL HERE ###
+
+                    for k in b.neighbors(i):
+
+                        # Compute pD, the probability that a single defector mutant takes over a resident 
+                        # population of cooperators.
+                        pD += self.u[b_idx] * 1 ### FILL HERE ###
 
         return "Selection favors cooperation." if pC > pD else "Selection favors defection."
 
