@@ -6,6 +6,7 @@ with the strategic evolution of cooperation.
 
 import numpy as np
 import networkx as nx
+import matplotlib.pyplot as plt
 
 class CooperationEvolution:
 
@@ -63,36 +64,35 @@ class CooperationEvolution:
         self.u = list((U[:,np.isclose(S, 1)][:,0] / U[:,np.isclose(S, 1)][:,0].sum()).real)
 
         # Assign a random weight between 0 and 1 to all edges of the graph.
-        nx.set_edge_attributes(self.G, 0, 'w')   # Weight indicates the influence between i and j
-        for _, _, data in self.G.edges(data=True): 
-            data['w'] = self.rng.uniform(low=0.0, high=1.0)
+        for G in self.L:    
+            nx.set_edge_attributes(G, 0, 'w')   # Weight indicates the influence between i and j
+            for _, _, data in G.edges(data=True): 
+                data['w'] = self.rng.uniform(low=0.0, high=1.0)
 
         # Assign a strategy to each node (0: Defector, 1: Cooperator).
-        for _, data in self.G.nodes(data=True):
-            data['x'] = 0 if self.rng.random() < 0.5 else 1
+        # for _, data in self.G.nodes(data=True):
+            # data['x'] = 0 if self.rng.random() < 0.5 else 1
+        self.x = (self.rng.random(self.n) < 0.5).astype(int)
 
     def play(self) -> None:
 
         """
         Executes the donation game between all nodes with their neighbors,
         and stores the fecundity of each node in the data dictionary F of the graph.
-
-        Note: For a dynamic model, the method should be iterated in a loop as many T times as the evolution progresses.
-
         """
 
-        for i, data in self.G.nodes(data=True):
+        for i in self.G.nodes():
 
             # Calculate accumulated payoff of node i.
-            xi = data['x']   # "Is node i a cooperator?"
-            u = 0
+            xi = self.x[i]   # "Is node i a cooperator?"
+            u = 0.0
             for j in self.G.neighbors(i):
-                xj = self.G.nodes[j]['x']   # "Is node i's neighbor j a cooperator?"
+                xj = self.x[j]   # "Is node i's neighbor j a cooperator?"
                 wij = self.G.edges[i,j]['w']
                 u += wij * ((self.b * xj) - (self.c * xi))   # Accumulated payoff of i per edge
 
             # Transform accumulated payoff into fecundity.
-            data['F'] = 1 + self.d * u
+            self.G.nodes[i]['F'] = 1 + self.d * u
 
     def update_strategy(self, iterations=1) -> None:
 
@@ -123,7 +123,8 @@ class CooperationEvolution:
             j = self.rng.choice(list(self.G.neighbors(i)), p=e)
 
             # Update strategy.
-            self.G.nodes[i]['x'] = self.G.nodes[j]['x']
+            # self.G.nodes[i]['x'] = self.G.nodes[j]['x']
+            self.x[i] = self.x[j]
 
     def population_transition(self) -> None:
 
@@ -139,7 +140,7 @@ class CooperationEvolution:
         new_state = self.rng.choice(len(self.L), p=self.Q[self.L.index(self.G)])
         self.G = self.L[new_state] 
 
-    def run(self, T: int, strategy_updates: int = 1) -> None:
+    def run(self, T: int, strategy_updates: int = 1, visualize: bool = False) -> None:
 
         """
         Simulates the evolution of cooperation in a dynamic network.
@@ -147,13 +148,55 @@ class CooperationEvolution:
         Args:
             T: Number of time steps to run the model for.
             strategy_updates: The number of times that a random strategy update occurs in one single time step.
-
+            visualize: Whether to generate a visualization of the network state at each time step of the evolution.
         """
 
+        self.T = T
+        if visualize:
+            fig, axes = plt.subplots(1, self.T, figsize=(6*T, 3))
+            # if T == 1:
+                # axes = [axes]
         for t in range(T):
             self.play()
             self.update_strategy(iterations=strategy_updates)
             self.population_transition()
+            if visualize:
+                self.visualize(fig, axes, ax=t, pos=nx.kamada_kawai_layout(self.G)) # seed=3113794652
+        if visualize:
+            plt.tight_layout()
+            plt.show()
+
+
+    def visualize(self, fig, axes, ax: int, pos) -> None:
+        
+        """
+        Visualizes the current network state, with node colors indicating strategy (red: Cooperator, blue: Defector).
+        Args:
+            fig: The figure object for the visualization.
+            axes: The axes object for the visualization.
+            ax: The index of the current time step, used for labeling the visualization.
+        """
+
+        axt = axes[ax]
+        axt.clear() 
+
+        # Source: https://networkx.org/documentation/stable/auto_examples/drawing/plot_labels_and_colors.html
+        options = {"edgecolors": "tab:gray", "node_size": 200, "alpha": 0.9}
+       
+        # Sync node strategies.
+        nx.set_node_attributes(self.G, {i: int(self.x[i]) for i in self.G.nodes()}, "x")
+
+        cooperators = [node for node, data in self.G.nodes(data=True) if data['x'] == 1]
+        defectors = [node for node, data in self.G.nodes(data=True) if data['x'] == 0]
+        labels = {n: ("C" if self.G.nodes[n].get('x', 0) == 1 else "D") for n in self.G.nodes()}
+
+        nx.draw_networkx_nodes(self.G, pos=pos, nodelist=cooperators, node_color="tab:green", ax=axt, **options)
+        nx.draw_networkx_nodes(self.G, pos=pos, nodelist=defectors, node_color="tab:red", ax=axt, **options)
+        nx.draw_networkx_edges(self.G, pos=pos, edge_color="tab:gray", alpha=0.5, ax=axt)
+        nx.draw_networkx_labels(self.G, pos=pos, labels=labels, font_size=10, font_color="whitesmoke", ax=axt)
+
+        axt.set_title(f"Time step {ax+1}", fontsize=10)
+        axt.set_axis_off()
 
     def selection(self) -> str:
         """
@@ -225,14 +268,3 @@ class CooperationEvolution:
                         pD += self.u[b_idx] * 1 ### FILL HERE ###
 
         return "Selection favors cooperation." if pC > pD else "Selection favors defection."
-
-
-        
-
-
-
-         
-
-
-
-
