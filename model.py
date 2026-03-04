@@ -7,6 +7,7 @@ with the strategic evolution of cooperation.
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+import os
 
 class CooperationEvolution:
 
@@ -16,16 +17,15 @@ class CooperationEvolution:
 
     """
     
-    def __init__(self, L, c: float, b: float, p: float, d: float =0.01, seed: int =42):
+    def __init__(self, L, b: float, c: float, p: float, d: float =0.01):
 
         """
         Args:  
             L: A list of NetworkX graphs, assumed to be connected graphs.
-            c: Cost coefficient for any Cooperator node.
             b: Benefit coefficient for any node with a Cooperator neighbor.
+            c: Cost coefficient for any Cooperator node.
             p: Probability of remaining in the same network state.
             d: Selection intensity, assumed to be small or weak (d≪1).
-            seed: Seed for a random number generator.
 
         """
         
@@ -44,7 +44,7 @@ class CooperationEvolution:
         self.d = d
 
         # Define a random number generator with the given seed.
-        self.rng = np.random.default_rng(seed=seed)
+        self.rng = np.random.default_rng() # seed=42
 
         # Define the initial network state.
         state = self.rng.integers(low=0, high=len(self.L))
@@ -73,6 +73,8 @@ class CooperationEvolution:
         # for _, data in self.G.nodes(data=True):
             # data['x'] = 0 if self.rng.random() < 0.5 else 1
         self.x = (self.rng.random(self.n) < 0.5).astype(int)
+
+        self.outcome = -1111
 
     def play(self) -> None:
 
@@ -140,7 +142,7 @@ class CooperationEvolution:
         new_state = self.rng.choice(len(self.L), p=self.Q[self.L.index(self.G)])
         self.G = self.L[new_state] 
 
-    def run(self, T: int, strategy_updates: int = 1, visualize: bool = False) -> None:
+    def run(self, T: int, strategy_updates: int = 1, savefig: bool = False, fname: str = '') -> None:
 
         """
         Simulates the evolution of cooperation in a dynamic network.
@@ -148,40 +150,69 @@ class CooperationEvolution:
         Args:
             T: Number of time steps to run the model for.
             strategy_updates: The number of times that a random strategy update occurs in one single time step.
-            visualize: Whether to generate a visualization of the network state at each time step of the evolution.
+            savefig: Whether to save a visualization of the run. 
+            fname: Name to save the figure with.
         """
 
+        # Create the canvas for the visualization.
         self.T = T
-        if visualize:
-            fig, axes = plt.subplots(1, self.T, figsize=(6*T, 3))
-            # if T == 1:
-                # axes = [axes]
+        if savefig:
+            ncols = min(10, T)
+            nrows = int(np.ceil(T/ncols))
+            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(2*ncols, 2*nrows))
+            if nrows == 1:
+                axes = axes.reshape(1, -1)
+            pos = nx.kamada_kawai_layout(self.G)
+
+        # Run the evolution.
         for t in range(T):
             self.play()
             self.update_strategy(iterations=strategy_updates)
             self.population_transition()
-            if visualize:
-                self.visualize(fig, axes, ax=t, pos=nx.kamada_kawai_layout(self.G)) # seed=3113794652
-        if visualize:
+
+            # Visualize the current time step.
+            if savefig:
+                row = int(t // ncols)
+                col = int(t % ncols)
+                ax = axes[row, col]
+
+                self.visualize(ax=ax, pos=pos, t=t)
+        
+        # Calculate the outcome: if the evolution has reached a monomorphic state,
+        # the outcome is 1 if all nodes are Cooperators or -1 if all nodes are Defectors.
+        # If monomorphism is not reached, the outcome is 0.
+        same = len({x for x in self.x}) == 1
+        if (same and self.x[0] == 1):
+            self.outcome = 1
+        elif (same and self.x[0] == 0):
+            self.outcome = -1
+        else: 
+            self.outcome = 0
+
+        if savefig:
+            for empty in range(T, nrows * ncols):
+                row = empty // ncols
+                col = empty % ncols
+                axes[row, col].set_visible(False)
             plt.tight_layout()
-            plt.show()
+            plt.savefig(fname=f'figures/{fname}')
 
+        return self.outcome
 
-    def visualize(self, fig, axes, ax: int, pos) -> None:
+    def visualize(self, ax, pos, t: int) -> None:
         
         """
         Visualizes the current network state, with node colors indicating strategy (red: Cooperator, blue: Defector).
         Args:
-            fig: The figure object for the visualization.
-            axes: The axes object for the visualization.
-            ax: The index of the current time step, used for labeling the visualization.
+            ax: The [nrows, ncols] index of the current time step, used for labeling the visualization.
+            pos:
+            t:
         """
 
-        axt = axes[ax]
-        axt.clear() 
+        ax.clear() 
 
         # Source: https://networkx.org/documentation/stable/auto_examples/drawing/plot_labels_and_colors.html
-        options = {"edgecolors": "tab:gray", "node_size": 200, "alpha": 0.9}
+        options = {"edgecolors": "tab:gray", "node_size": 130, "alpha": 0.9}
        
         # Sync node strategies.
         nx.set_node_attributes(self.G, {i: int(self.x[i]) for i in self.G.nodes()}, "x")
@@ -190,13 +221,13 @@ class CooperationEvolution:
         defectors = [node for node, data in self.G.nodes(data=True) if data['x'] == 0]
         labels = {n: ("C" if self.G.nodes[n].get('x', 0) == 1 else "D") for n in self.G.nodes()}
 
-        nx.draw_networkx_nodes(self.G, pos=pos, nodelist=cooperators, node_color="tab:green", ax=axt, **options)
-        nx.draw_networkx_nodes(self.G, pos=pos, nodelist=defectors, node_color="tab:red", ax=axt, **options)
-        nx.draw_networkx_edges(self.G, pos=pos, edge_color="tab:gray", alpha=0.5, ax=axt)
-        nx.draw_networkx_labels(self.G, pos=pos, labels=labels, font_size=10, font_color="whitesmoke", ax=axt)
+        nx.draw_networkx_nodes(self.G, pos=pos, nodelist=cooperators, node_color="tab:green", ax=ax, **options)
+        nx.draw_networkx_nodes(self.G, pos=pos, nodelist=defectors, node_color="tab:red", ax=ax, **options)
+        nx.draw_networkx_edges(self.G, pos=pos, edge_color="tab:gray", alpha=0.3, ax=ax)
+        nx.draw_networkx_labels(self.G, pos=pos, labels=labels, font_size=8, font_color="whitesmoke", ax=ax)
 
-        axt.set_title(f"Time step {ax+1}", fontsize=10)
-        axt.set_axis_off()
+        ax.set_title(f"Time step {t+1}", fontsize=10)
+        ax.set_axis_off()
 
     def selection(self) -> str:
         """

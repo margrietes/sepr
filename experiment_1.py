@@ -3,9 +3,8 @@ This Python script runs the first experiment of the dynamic network model, which
 discusses the the impact of sparse and dense communities on the evolution of cooperation.
 
 """
-
-from turtle import pos
-
+import numpy as np
+import pandas as pd
 import model as ce
 import graphs as g
 
@@ -28,19 +27,49 @@ if __name__ == "__main__":
 
     # Assign model values.
 
-    n = 16    # Number of nodes in the graph
-    c = 3     # Cost coefficient
-    b = 3     # Benefit coefficient
-    T = 5   # Number of time steps to run the model for
+    # Number of nodes in the graph.
+    N = np.arange(start=8, stop=37, step=4).tolist()
 
-    # Generate a list of network structures.
+    # Number of time steps to run the model for.
+    T = 100
 
-    Graphs = [
-        g.star_complete_barbell_graph(size=n, first='star'),
-        g.star_complete_barbell_graph(size=n, first='complete')
-    ]
+    # Number of runs for each parameter set.
+    runs = 100
 
-    # Run the model.
+    # Given ratios around the critical value of 7 and the cost (denominator of b/c ratio), 
+    # calculate the benefit coefficient.
+    ratios = [4, 5, 6, 7, 8, 9, 10, 12]
+    C = [1, 2, 3, 5, 10]
+    BC = [((r * c), c) for c in C for r in ratios] # (benefit, cost) tuple
 
-    model = ce.CooperationEvolution(L=Graphs, c=c, b=b, p=1/len(Graphs))
-    model.run(T=T, visualize=True)
+    results = []
+
+    for n in N:
+
+        # Generate a list of network structures (n must be an even number).
+        Graphs = [
+            g.star_complete_barbell_graph(size=n, first='star'),
+            g.star_complete_barbell_graph(size=n, first='complete')
+        ]
+
+        # Probability of remaining in the same network state.
+        P = [1/(n*2), 1/n, 1/(n/2)]
+
+        print(f"N: {n}")
+
+        for p in P:
+
+            for (b, c) in BC:
+
+                # Run the model.
+                total = 0
+                for i in range(runs):
+                    model = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=p)
+                    outcome = model.run(T=T) # savefig=True, fname='exp1'
+                    total += outcome 
+
+                # Save results.
+                results.append({'n': n, 'p': p, 'b': b, 'c': c, 'b/c': b/c, 'outcome': total, 'mean_outcome': total/runs})
+
+    # Export results.
+    pd.DataFrame(results).to_csv('results.csv', index=False)
