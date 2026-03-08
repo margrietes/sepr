@@ -51,8 +51,7 @@ if __name__ == "__main__":
     else:
 
         # Number of nodes in the graph (a list ranging from 8 to 32).
-        # N = np.arange(start=4, stop=33, step=2).tolist()
-        N = [4, 6, 10, 14, 18, 22, 26]
+        N = np.arange(start=4, stop=33, step=2).tolist()
 
         # Number of runs for each parameter set.
         runs = 1000
@@ -84,8 +83,8 @@ if __name__ == "__main__":
                     # Run the model.
                     tot_c = 0
                     for i in range(runs):
-                        model = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=p, strategy='single cooperator') # strategy='single cooperator'
-                        outcome = model.run() # savefig=True, fname='exp1'
+                        model = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=p, strategy='single cooperator') 
+                        outcome = model.run() 
                         tot_c += 1 if outcome == 1 else 0
 
                     # Save results.
@@ -93,4 +92,4 @@ if __name__ == "__main__":
                     # print(f'{b/c}\t{tot_c}')
 
         # Export results.
-        pd.DataFrame(results).to_csv('results/exp_1_2.csv', index=False)
+        pd.DataFrame(results).to_csv('results/exp_1.csv', index=False)

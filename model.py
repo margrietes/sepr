@@ -206,11 +206,11 @@ class CooperationEvolution:
     def visualize(self, ax, pos, t: int) -> None:
         
         """
-        Visualizes the current network state, with node colors indicating strategy (red: Cooperator, blue: Defector).
+        Visualizes the current network state, with node colors indicating strategy (green: Cooperator, red: Defector).
         Args:
             ax: The [nrows, ncols] index of the current time step, used for labeling the visualization.
-            pos:
-            t:
+            pos: The node layout mapping.
+            t: The time step that is being visualized.
         """
 
         ax.clear() 

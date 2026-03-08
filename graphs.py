@@ -65,6 +65,6 @@ def three_communities_graph(size: int, pair: str) -> nx.Graph:
         G = nx.compose(complete, star)
 
     else:
-        raise ValueError("Argument 'first' must have value 'star' or 'complete'.")
+        raise ValueError("Argument 'pair' must have value 'star' or 'complete'.")
 
     return G
