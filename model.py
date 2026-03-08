@@ -7,7 +7,6 @@ with the strategic evolution of cooperation.
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-import os
 
 class CooperationEvolution:
 
@@ -17,7 +16,7 @@ class CooperationEvolution:
 
     """
     
-    def __init__(self, L, b: float, c: float, p: float, d: float =0.01):
+    def __init__(self, L, b: float, c: float, p: float, strategy: str = 'random', d: float =0.01):
 
         """
         Args:  
@@ -25,7 +24,8 @@ class CooperationEvolution:
             b: Benefit coefficient for any node with a Cooperator neighbor.
             c: Cost coefficient for any Cooperator node.
             p: Probability of remaining in the same network state.
-            d: Selection intensity, assumed to be small or weak (d≪1).
+            strategy: 'random' (default), or 'single cooperator', to assign one cooperator mutant to a population of defectors.
+            d: Selection intensity, with default assumed to be small or weak (d≪1).
 
         """
         
@@ -58,8 +58,8 @@ class CooperationEvolution:
         self.Q = Q
 
         # Compute the stationary distribution u of the transition matrix Q.
-        # Source: 
-        # https://datascience.oneoffcoder.com/markov-chain-stationary-distribution.html (Section 11.3. "Numpy, eig")
+        # Source: https://datascience.oneoffcoder.com/markov-chain-stationary-distribution.html 
+        # (Section 11.3. "Numpy, eig")
         S, U = np.linalg.eig(self.Q.T)
         self.u = list((U[:,np.isclose(S, 1)][:,0] / U[:,np.isclose(S, 1)][:,0].sum()).real)
 
@@ -69,10 +69,16 @@ class CooperationEvolution:
             for _, _, data in G.edges(data=True): 
                 data['w'] = self.rng.uniform(low=0.0, high=1.0)
 
-        # Assign a strategy to each node (0: Defector, 1: Cooperator).
-        # for _, data in self.G.nodes(data=True):
-            # data['x'] = 0 if self.rng.random() < 0.5 else 1
-        self.x = (self.rng.random(self.n) < 0.5).astype(int)
+        if strategy == 'random':
+            # Assign a strategy to each node (0: Defector, 1: Cooperator).
+            self.x = (self.rng.random(self.n) < 0.5).astype(int)
+        elif strategy == 'single cooperator':
+            # Assign Defector strategy to all nodes.
+            self.x = np.zeros(self.n, dtype=int)
+            # Select a random node to transform into Cooperator.
+            self.x[self.rng.integers(self.n)] = 1
+        else: 
+            raise ValueError("Strategy must be 'random' or 'single cooperator'.")
 
         self.outcome = -1111
 
@@ -94,7 +100,7 @@ class CooperationEvolution:
                 u += wij * ((self.b * xj) - (self.c * xi))   # Accumulated payoff of i per edge
 
             # Transform accumulated payoff into fecundity.
-            self.G.nodes[i]['F'] = 1 + self.d * u
+            self.G.nodes[i]['F'] = np.exp(self.d * u)
 
     def update_strategy(self, iterations=1) -> None:
 
@@ -102,9 +108,6 @@ class CooperationEvolution:
         Selects a random node i from the population, and updates its strategy 
         by copying the strategy of a neighbor j with a probability proportional to j's
         fecundity and the weight of the edge between i and j.
-
-        Note: For a dynamic model, the method should be iterated in a loop as many 
-        T times as the evolution progresses.
 
         Args:
             iterations: The number of times that a random strategy update occurs in one 
@@ -132,31 +135,46 @@ class CooperationEvolution:
 
         """
         Executes an exogenous transformation of the population.
-
-        Args:
-            L: Network states.
-
         """
 
         # Pick a new network state according to the transition probabilities in Q.
         new_state = self.rng.choice(len(self.L), p=self.Q[self.L.index(self.G)])
+        # print(f"{self.L.index(self.G)} -> {new_state}")
         self.G = self.L[new_state] 
 
-    def run(self, T: int, strategy_updates: int = 1, savefig: bool = False, fname: str = '') -> None:
+    def run(self, max_steps: int = 500, strategy_updates: int = 1, savefig: bool = False, fname: str = '') -> None:
 
         """
         Simulates the evolution of cooperation in a dynamic network.
 
         Args:
-            T: Number of time steps to run the model for.
+            max_steps: Maximum steps of running the simulation.
             strategy_updates: The number of times that a random strategy update occurs in one single time step.
             savefig: Whether to save a visualization of the run. 
             fname: Name to save the figure with.
         """
 
-        # Create the canvas for the visualization.
-        self.T = T
+        frames = []
+        t = 0
+
+        # Run the evolution.
+        while len(set(self.x)) > 1 and t < max_steps:
+            self.play()
+            self.update_strategy(iterations=strategy_updates)
+            self.population_transition()
+            if savefig:
+                frames.append((self.x.copy(), self.L.index(self.G)))
+            t += 1
+                
+        if len(set(self.x)) == 1:
+            self.outcome = 1 if self.x[0] == 1 else -1
+        else:
+            self.outcome = 0
+
         if savefig:
+
+            # Create the canvas for the visualization.
+            T = len(frames)
             ncols = min(10, T)
             nrows = int(np.ceil(T/ncols))
             fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(2*ncols, 2*nrows))
@@ -164,36 +182,22 @@ class CooperationEvolution:
                 axes = axes.reshape(1, -1)
             pos = nx.kamada_kawai_layout(self.G)
 
-        # Run the evolution.
-        for t in range(T):
-            self.play()
-            self.update_strategy(iterations=strategy_updates)
-            self.population_transition()
-
-            # Visualize the current time step.
-            if savefig:
+            # Visualize each time step.
+            for t, (x, g) in enumerate(frames):
+                self.x = x
+                self.G = self.L[g]
                 row = int(t // ncols)
                 col = int(t % ncols)
                 ax = axes[row, col]
 
                 self.visualize(ax=ax, pos=pos, t=t)
-        
-        # Calculate the outcome: if the evolution has reached a monomorphic state,
-        # the outcome is 1 if all nodes are Cooperators or -1 if all nodes are Defectors.
-        # If monomorphism is not reached, the outcome is 0.
-        same = len({x for x in self.x}) == 1
-        if (same and self.x[0] == 1):
-            self.outcome = 1
-        elif (same and self.x[0] == 0):
-            self.outcome = -1
-        else: 
-            self.outcome = 0
 
-        if savefig:
+            # Hide empty axes.
             for empty in range(T, nrows * ncols):
                 row = empty // ncols
                 col = empty % ncols
                 axes[row, col].set_visible(False)
+
             plt.tight_layout()
             plt.savefig(fname=f'figures/{fname}')
 
@@ -217,8 +221,8 @@ class CooperationEvolution:
         # Sync node strategies.
         nx.set_node_attributes(self.G, {i: int(self.x[i]) for i in self.G.nodes()}, "x")
 
-        cooperators = [node for node, data in self.G.nodes(data=True) if data['x'] == 1]
-        defectors = [node for node, data in self.G.nodes(data=True) if data['x'] == 0]
+        cooperators = [i for i in self.G.nodes() if self.x[i] == 1]
+        defectors   = [i for i in self.G.nodes() if self.x[i] == 0]
         labels = {n: ("C" if self.G.nodes[n].get('x', 0) == 1 else "D") for n in self.G.nodes()}
 
         nx.draw_networkx_nodes(self.G, pos=pos, nodelist=cooperators, node_color="tab:green", ax=ax, **options)
