@@ -35,23 +35,29 @@ if __name__ == "__main__":
 
     if sample_run:
 
-        n = 16
+        n = 12
         b, c = 8, 1
 
         Graphs = [
                 g.star_complete_barbell_graph(size=n, first='star'),
                 g.star_complete_barbell_graph(size=n, first='complete')]
         
-        model = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=0.5, strategy='single cooperator')
-        outcome = model.run(savefig=True, fname='exp_1')
+        model = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=0.75, strategy='single cooperator')
+        outcome = model.run(savefig=True, fname='exp_1_single_coop')
+
+        model = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=0.75, strategy='single defector')
+        outcome = model.run(savefig=True, fname='exp_1_single_def')
+
+        model = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=0.75, strategy='random')
+        outcome = model.run(savefig=True, fname='exp_1_random_strategy')
 
 
     ### SIMULATION ###
 
     else:
 
-        # Number of nodes in the graph (a list ranging from 8 to 32).
-        N = np.arange(start=4, stop=33, step=2).tolist()
+        # Number of nodes in the graph (a list ranging from 6 to 20).
+        N = np.arange(start=6, stop=21, step=2).tolist()
 
         # Number of runs for each parameter set.
         runs = 1000
@@ -82,14 +88,26 @@ if __name__ == "__main__":
 
                     # Run the model.
                     tot_c = 0
+                    tot_d = 0
+
                     for i in range(runs):
-                        model = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=p, strategy='single cooperator') 
-                        outcome = model.run() 
-                        tot_c += 1 if outcome == 1 else 0
+
+                        model_c = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=p, strategy='single cooperator') 
+                        outcome_c = model_c.run() 
+                        tot_c += 1 if outcome_c == 1 else 0
+
+                        model_d = ce.CooperationEvolution(L=Graphs, b=b, c=c, p=p, strategy='single defector') 
+                        outcome_d = model_d.run() 
+                        tot_d += 1 if outcome_d == -1 else 0
+
+                        pC = tot_c / 1000
+                        pD = tot_d / 1000
 
                     # Save results.
-                    results.append({'n': n, 'p': p, 'b': b, 'c': c, 'b/c': b/c, f'coop_outcomes_per_{runs}_runs': tot_c})
-                    # print(f'{b/c}\t{tot_c}')
+                    results.append({'n': n, 'p': p, 'b': b, 'c': c, 'b/c': b/c, 
+                                    'pC': pC, 
+                                    'pD': pD, 
+                                    'pC > pD': 1 if pC > pD else 0})
 
         # Export results.
         pd.DataFrame(results).to_csv('results/exp_1.csv', index=False)

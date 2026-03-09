@@ -24,7 +24,7 @@ class CooperationEvolution:
             b: Benefit coefficient for any node with a Cooperator neighbor.
             c: Cost coefficient for any Cooperator node.
             p: Probability of remaining in the same network state.
-            strategy: 'random' (default), or 'single cooperator', to assign one cooperator mutant to a population of defectors.
+            strategy: 'random' (default), 'single cooperator' or 'single defector', to assign one cooperator mutant to a population of defectors.
             d: Selection intensity, with default assumed to be small or weak (d≪1).
 
         """
@@ -77,8 +77,13 @@ class CooperationEvolution:
             self.x = np.zeros(self.n, dtype=int)
             # Select a random node to transform into Cooperator.
             self.x[self.rng.integers(self.n)] = 1
+        elif strategy == 'single defector':
+            # Assign Cooperator strategy to all nodes.
+            self.x = np.ones(self.n, dtype=int)
+            # Select a random node to transform into Defector.
+            self.x[self.rng.integers(self.n)] = 0
         else: 
-            raise ValueError("Strategy must be 'random' or 'single cooperator'.")
+            raise ValueError("Strategy must be 'random', 'single cooperator', or 'single defector'.")
 
         self.outcome = -1111
 
