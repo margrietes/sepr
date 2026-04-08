@@ -5,6 +5,7 @@ discusses the the impact of sparse and dense communities on the evolution of coo
 """
 import sys
 from pathlib import Path
+import time
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -60,29 +61,31 @@ if __name__ == "__main__":
         N = np.arange(start=6, stop=21, step=2).tolist()
 
         # Number of runs for each parameter set.
-        runs = 1000
+        runs = 10000
 
         # Given ratios around the critical value of 7 and the cost (denominator of b/c ratio), 
         # calculate the benefit coefficient.
-        ratios = [4, 5, 6, 7, 8, 9, 10]
+        ratios = [5, 6, 7, 8, 9]
         C = [1, 2, 3]
         BC = [((r * c), c) for c in C for r in ratios] # (benefit, cost) tuple
 
         # Probability of remaining in the same network state.
-        P = [0.25, 0.5, 0.75]
+        P = [0.2, 0.4, 0.6, 0.8]
 
         results = []
 
         for n in N:
+
+            start_time = time.time()
 
         # Generate a list of network structures (n must be an even number).
             Graphs = [
                 g.star_complete_barbell_graph(size=n, first='star'),
                 g.star_complete_barbell_graph(size=n, first='complete')]
 
-            print(f"\nN: {n}\n")
-
             for p in P:
+
+                print(f"\nN: {n}\tp: {p}\t", end='')
 
                 for b, c in BC:
 
@@ -108,6 +111,8 @@ if __name__ == "__main__":
                                     'pC': pC, 
                                     'pD': pD, 
                                     'pC > pD': 1 if pC > pD else 0})
+                
+                print(f"Time (min): {((time.time() - start_time)/60):.2f}")
 
         # Export results.
         pd.DataFrame(results).to_csv('results/exp_1.csv', index=False)

@@ -41,7 +41,7 @@ if __name__ == "__main__":
     ### Other ###
 
     # Regression line of b/c values 
-    # sns.lmplot(data=data, x="pC", y="pD", hue="b/c", scatter_kws={"s": 10, "alpha": 0.5})
+    sns.lmplot(data=data, x="pC", y="pD", hue="b/c", scatter_kws={"s": 10, "alpha": 0.5})
 
     # Line plot of b/c values
     # sns.lineplot(data=data, x="pC", y="pD", hue="b/c")
