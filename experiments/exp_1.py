@@ -1,8 +1,23 @@
 """
-This Python script runs the first experiment of the dynamic network model, which
-discusses the the impact of sparse and dense communities on the evolution of cooperation.
+This Python script runs the first experiment of the dynamic network model.
+It generates 10_000 simulations for each parameter set of 
+        
+        n: number of nodes from 6 to 20 (even numbers only),
+        p: probability of remaining in the same state (0.2, 0.4, 0.6, 0.8),
+        b: benefit coefficient , 
+        c: cost coefficient, and
+        b/c: benefit-to-cost ratio,
 
+and calculates 
+
+        pC: the average probability of a single cooperator overtaking a population of defectors,
+        pD: the average probability of a single defector overtaking a population of cooperators, and
+        pC > pD: whether pC is greater than pD.
+
+The results are saved in a csv file that can be accessed in results/exp_1.csv. 
+The visualizations of the results can be found in visualizations/exp_1.ipynb.
 """
+
 import sys
 from pathlib import Path
 import time
@@ -15,18 +30,6 @@ import model as ce
 import graphs as g
 
 if __name__ == "__main__":
-
-    """
-    When the population transitions dynamically between networks 1 and 2, cooperation is favored
-    provided the benefit-to-cost ratio b/c exceeds the critical value (b/c) ≈ 7. As a result, we
-    see that dynamic population structures can favor cooperation, even when all networks involved
-    would each individually suppress cooperation were they static.
-    
-    Dynamic population structure facilitates cooperation across a wide range of population sizes
-    for the pair of networks. When t1 = t2 = 1, which means that individuals each update their 
-    strategy once, on average, before the network changes, cooperation can be favored by selection 
-    regardless of network size, N.
-    """
 
     sample_run = False
 
@@ -61,7 +64,7 @@ if __name__ == "__main__":
         N = np.arange(start=6, stop=21, step=2).tolist()
 
         # Number of runs for each parameter set.
-        runs = 10000
+        runs = 10_000
 
         # Given ratios around the critical value of 7 and the cost (denominator of b/c ratio), 
         # calculate the benefit coefficient.
@@ -103,8 +106,8 @@ if __name__ == "__main__":
                         outcome_d = model_d.run() 
                         tot_d += 1 if outcome_d == -1 else 0
 
-                        pC = tot_c / 1000
-                        pD = tot_d / 1000
+                    pC = tot_c / runs
+                    pD = tot_d / runs
 
                     # Save results.
                     results.append({'n': n, 'p': p, 'b': b, 'c': c, 'b/c': b/c, 
@@ -112,7 +115,8 @@ if __name__ == "__main__":
                                     'pD': pD, 
                                     'pC > pD': 1 if pC > pD else 0})
                 
-                print(f"Time (min): {((time.time() - start_time)/60):.2f}")
+                elapsed = time.time() - start_time
+                print(f"Time (min): {int(elapsed//60)}:{int(elapsed%60):02d}\n")
 
         # Export results.
         pd.DataFrame(results).to_csv('results/exp_1.csv', index=False)

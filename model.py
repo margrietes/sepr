@@ -5,8 +5,8 @@ with the strategic evolution of cooperation.
 """
 
 import numpy as np
+import copy
 import networkx as nx
-import matplotlib.pyplot as plt
 
 class CooperationEvolution:
 
@@ -38,22 +38,22 @@ class CooperationEvolution:
         if (c < 0) or (b < 0):
             raise ValueError("Cost and benefit must be non-negative.")
 
-        self.L = L
+        self.L = [copy.deepcopy(G) for G in L]
         self.c = c
         self.b = b
         self.d = d
 
-        # Define a random number generator with the given seed.
-        self.rng = np.random.default_rng() # seed=42
+        # Define a random number generator.
+        self.rng = np.random.default_rng()
 
         # Define the initial network state.
         state = self.rng.integers(low=0, high=len(self.L))
         self.G = self.L[state]
         self.n = self.G.number_of_nodes()
 
-        # Generate a LxL transition matrix Q (a sticky symmetric matrix).
-        L = len(self.L)
-        Q = np.full((L, L), (1 - p) / (L - 1))
+        # Generate an mxm transition matrix Q (a sticky symmetric matrix).
+        m = len(self.L)
+        Q = np.full((m, m), (1 - p) / (m - 1))
         np.fill_diagonal(Q, p)
         self.Q = Q
 
@@ -87,6 +87,34 @@ class CooperationEvolution:
 
         self.outcome = -1111
 
+        self._save_initial_state()
+
+    def _save_initial_state(self) -> None:
+
+        self._initial_state = {
+            'G_index': self.L.index(self.G),
+            'x': self.x.copy(),
+            'outcome': self.outcome,
+            'edge_weights': [
+                {(u, v): data['w'] for u, v, data in G.edges(data=True)}
+                for G in self.L
+            ]
+        }
+
+    def reset(self) -> None:
+        
+        state = copy.deepcopy(self._initial_state)
+
+        self.G = self.L[state['G_index']]
+        self.x = state['x']
+        self.outcome = state['outcome']
+
+        for G, weights in zip(self.L, state['edge_weights']):
+            for (u, v), w in weights.items():
+                G.edges[u, v]['w'] = w
+            for i in G.nodes():
+                G.nodes[i].pop('F', None)
+
     def play(self) -> None:
 
         """
@@ -98,14 +126,14 @@ class CooperationEvolution:
 
             # Calculate accumulated payoff of node i.
             xi = self.x[i]   # "Is node i a cooperator?"
-            u = 0.0
+            payoff = 0.0
             for j in self.G.neighbors(i):
                 xj = self.x[j]   # "Is node i's neighbor j a cooperator?"
                 wij = self.G.edges[i,j]['w']
-                u += wij * ((self.b * xj) - (self.c * xi))   # Accumulated payoff of i per edge
+                payoff += wij * ((self.b * xj) - (self.c * xi))   # Accumulated payoff of i per edge
 
             # Transform accumulated payoff into fecundity.
-            self.G.nodes[i]['F'] = np.exp(self.d * u)
+            self.G.nodes[i]['F'] = np.exp(self.d * payoff)
 
     def update_strategy(self, iterations=1) -> None:
 
@@ -147,7 +175,7 @@ class CooperationEvolution:
         # print(f"{self.L.index(self.G)} -> {new_state}")
         self.G = self.L[new_state] 
 
-    def run(self, max_steps: int = 500, strategy_updates: int = 1, savefig: bool = False, fname: str = '') -> None:
+    def run(self, max_steps: int = 500, strategy_updates: int = 1, savefig: bool = False, fname: str = '') -> int:
 
         """
         Simulates the evolution of cooperation in a dynamic network.
@@ -157,6 +185,8 @@ class CooperationEvolution:
             strategy_updates: The number of times that a random strategy update occurs in one single time step.
             savefig: Whether to save a visualization of the run. 
             fname: Name to save the figure with.
+        Returns:
+            outcome: 1 if the population converges to all Cooperators, -1 if it converges to all Defectors, and 0 if it does not converge within max_steps.
         """
 
         frames = []
@@ -177,6 +207,8 @@ class CooperationEvolution:
             self.outcome = 0
 
         if savefig:
+
+            import matplotlib.pyplot as plt
 
             # Create the canvas for the visualization.
             T = len(frames)
@@ -237,74 +269,3 @@ class CooperationEvolution:
 
         ax.set_title(f"Time step {t+1}", fontsize=10)
         ax.set_axis_off()
-
-    def selection(self) -> str:
-        """
-        Evaluates the condition for selection to favor cooperation over defection in the limit of weak selection (d→0).
-
-        Returns:
-            A string indicating whether selection favors cooperation or defection.
-        """
-
-        def random_walk_probability(b, i, j):  
-            """Args: b: A network state (graph) in L; i: A node in b; j: A neighbor of i in b. Returns the probability that a random walk from i to j is taken, proportional to edge weight of i and j."""
-            p_ij = b.edges[i,j]['w'] / sum(b.edges[i,k]['w'] for k in b.neighbors(i))
-            return p_ij
-        
-        def pi():
-            """Args: ..."""
-            
-            # The calculation applied is a generalization of Fisher's classical notion that 
-            # accounts for environmental changes (see Equation 7 in Methods).
-
-            ### APPLY LINEAR SYSTEM HERE ###
-            ### CHECK THAT SUM OF PI OVER ALL NODES IN A NETWORK IS 1 ###
-
-            return 0
-        
-        def coalescence_times(b_idx, i, j):
-            """Args: ..."""
-
-            if i == j:
-                t = 0
-            else:
-
-                def q_tilde(b_idx, g_idx):
-                    return (self.u[g_idx] / self.u[b_idx]) * self.Q[g_idx, b_idx]
-            
-                t = 0 ### IMPLEMENT LINEAR SYSTEM HERE TO SOLVE FOR t ###
-
-            T = self.n * t
-            return T, t
-        
-        def payoff(b, i):
-            "Args: ..."
-            T, t1 = 0, 0 # coalescence_times(ARGS)
-            T, t2 = 0, 0 # coalescence_times(ARGS)
-            payoff = sum((  - (T - t1) * b.edges[i,l]['w'] * self.c
-                            + (T - t2) * b.edges[l,i]['w'] * self.b) for l in b.nodes())
-            return payoff
-
-        pC = 0
-        pD = 0
-            
-        # Iterate through all network states b in L.
-        for b_idx, b in enumerate(self.L):
-
-            # Iterate through all nodes i in network state b.
-            for i in b.nodes():
-
-                # Iterate through all neighbors j of node i in network state b.
-                for j in b.neighbors(i):
-
-                    # Compute pC, the probability that a single cooperator mutant takes over a resident 
-                    # population of defectors
-                    pC += self.u[b_idx] * 1 ### FILL HERE ###
-
-                    for k in b.neighbors(i):
-
-                        # Compute pD, the probability that a single defector mutant takes over a resident 
-                        # population of cooperators.
-                        pD += self.u[b_idx] * 1 ### FILL HERE ###
-
-        return "Selection favors cooperation." if pC > pD else "Selection favors defection."
